@@ -1,0 +1,8 @@
+service: example.Hello
+method: HelloUnary
+mocks:
+  - request:
+      body: '{"name": "Dan"}'
+    response:
+      code: 200
+      body: '{"message": "Hello Dan!"}'

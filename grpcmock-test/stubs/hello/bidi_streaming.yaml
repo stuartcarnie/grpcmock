@@ -1,0 +1,14 @@
+service: example.Hello
+method: HelloBidiStreaming
+mocks:
+  - request:
+      body:
+        - '{"name": "Dan"}'
+        - '{"name": "Gaurav"}'
+        - '{"name": "Paul"}'
+    response:
+      code: 200
+      body:
+        - '{"message": "Hello Dan!"}'
+        - '{"message": "Hello Gaurav!"}'
+        - '{"message": "Hello Paul!"}'

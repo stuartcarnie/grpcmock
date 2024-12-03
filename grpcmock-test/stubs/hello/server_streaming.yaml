@@ -1,0 +1,11 @@
+service: example.Hello
+method: HelloServerStreaming
+mocks:
+  - request:
+      body: '{"name": "Dan, Paul, Gaurav"}'
+    response:
+      code: 200
+      body:
+        - '{"message": "Hello Dan!"}'
+        - '{"message": "Hello Paul!"}'
+        - '{"message": "Hello Gaurav!"}'
