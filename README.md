@@ -2,6 +2,10 @@
 
 grpcmock is a minimal framework for mocking gRPC services in Rust, supporting unary, client-streaming, server-streaming, and bidirectional-streaming methods.
 
+[![Crates.io](https://img.shields.io/crates/v/grpcmock)](https://crates.io/crates/grpcmock)
+[![Documentation](https://docs.rs/grpcmock/badge.svg)](https://docs.rs/grpcmock)
+[![Crates.io](https://img.shields.io/crates/l/grpcmock)](LICENSE)
+
 # Table of contents
 * [Features](#features)
 * [Stubbing](#stubbing)
