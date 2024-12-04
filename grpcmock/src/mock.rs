@@ -28,11 +28,6 @@ impl MockSet {
         Self::default()
     }
 
-    /// Creates a new [`MockSet`] with mocks.
-    pub fn with_mocks(mocks: impl IntoIterator<Item = (GrpcMethod, Vec<Mock>)>) -> Self {
-        Self(mocks.into_iter().collect())
-    }
-
     /// Inserts [`Mock`]s from a mock file.
     pub fn insert_from_file<I, O>(&mut self, path: impl AsRef<Path>) -> Result<(), Error>
     where
@@ -93,11 +88,80 @@ pub struct Mock {
 }
 
 impl Mock {
-    /// Creates a new [`Mock`] from a request and response message.
-    pub fn new(request: impl Message, response: impl Message) -> Self {
-        let request = MockRequest::new(request.to_bytes().into());
-        let response = MockResponse::new(response.to_bytes().into());
+    /// Creates a unary [`Mock`].
+    pub fn unary(request: impl Message, response: impl Message) -> Self {
+        let request = MockRequest::new(MockBody::Full(request.to_bytes()));
+        let response = MockResponse::new(MockBody::Full(response.to_bytes()));
         Self { request, response }
+    }
+
+    /// Creates a client-streaming [`Mock`].
+    pub fn client_streaming(
+        request: impl IntoIterator<Item = impl Message>,
+        response: impl Message,
+    ) -> Self {
+        let request = {
+            let body = request
+                .into_iter()
+                .map(|message| message.to_bytes())
+                .collect::<Vec<_>>();
+            MockRequest::new(MockBody::Stream(body))
+        };
+        let response = MockResponse::new(MockBody::Full(response.to_bytes()));
+        Self { request, response }
+    }
+
+    /// Creates a server-streaming [`Mock`].
+    pub fn server_streaming(
+        request: impl Message,
+        response: impl IntoIterator<Item = impl Message>,
+    ) -> Self {
+        let request = MockRequest::new(request.to_bytes().into());
+        let response = {
+            let body = response
+                .into_iter()
+                .map(|message| message.to_bytes())
+                .collect::<Vec<_>>();
+            MockResponse::new(MockBody::Stream(body))
+        };
+        Self { request, response }
+    }
+
+    /// Creates a bidi-streaming [`Mock`].
+    pub fn bidi_streaming(
+        request: impl IntoIterator<Item = impl Message>,
+        response: impl IntoIterator<Item = impl Message>,
+    ) -> Self {
+        let request = {
+            let body = request
+                .into_iter()
+                .map(|message| message.to_bytes())
+                .collect::<Vec<_>>();
+            MockRequest::new(MockBody::Stream(body))
+        };
+        let response = {
+            let body = response
+                .into_iter()
+                .map(|message| message.to_bytes())
+                .collect::<Vec<_>>();
+            MockResponse::new(MockBody::Stream(body))
+        };
+        Self { request, response }
+    }
+
+    pub fn with_code(mut self, code: http::StatusCode) -> Self {
+        self.response.code = code;
+        self
+    }
+
+    pub fn with_error(mut self, error: impl Into<String>) -> Self {
+        self.response.error = Some(error.into());
+        self
+    }
+
+    pub fn with_headers(mut self, headers: HeaderMap) -> Self {
+        self.response.headers = headers;
+        self
     }
 
     /// Encode JSON body representation ([`JsonMockBody`]) to protobuf body ([`MockBody`]).
@@ -180,11 +244,11 @@ impl MockBody {
 #[derive(Default, Debug, Clone, Deserialize)]
 pub struct MockRequest {
     #[serde(default, with = "http_serde::header_map")]
-    headers: HeaderMap,
+    pub headers: HeaderMap,
     #[serde(rename = "body")]
-    json_body: JsonMockBody,
+    pub(crate) json_body: JsonMockBody,
     #[serde(skip)]
-    body: MockBody,
+    pub body: MockBody,
 }
 
 impl MockRequest {
@@ -195,22 +259,8 @@ impl MockRequest {
         }
     }
 
-    pub fn with_headers(mut self, headers: HeaderMap) -> Self {
-        self.headers = headers;
-        self
-    }
-
-    pub fn with_body(mut self, body: MockBody) -> Self {
-        self.body = body;
-        self
-    }
-
     pub fn headers(&self) -> &HeaderMap {
         &self.headers
-    }
-
-    pub fn json_body(&self) -> &JsonMockBody {
-        &self.json_body
     }
 
     pub fn body(&self) -> &MockBody {
@@ -221,15 +271,15 @@ impl MockRequest {
 /// A mock response.
 #[derive(Default, Debug, Clone, Deserialize)]
 pub struct MockResponse {
-    #[serde(default, rename = "code", with = "http_serde::status_code")]
-    http_code: http::StatusCode,
+    #[serde(default, with = "http_serde::status_code")]
+    pub code: http::StatusCode,
     #[serde(default, with = "http_serde::header_map")]
-    headers: HeaderMap,
+    pub headers: HeaderMap,
     #[serde(rename = "body", default)]
-    json_body: JsonMockBody,
+    pub(crate) json_body: JsonMockBody,
     #[serde(skip)]
-    body: MockBody,
-    error: Option<String>,
+    pub body: MockBody,
+    pub error: Option<String>,
 }
 
 impl MockResponse {
@@ -240,40 +290,16 @@ impl MockResponse {
         }
     }
 
-    pub fn with_headers(mut self, headers: HeaderMap) -> Self {
-        self.headers = headers;
-        self
-    }
-
-    pub fn with_body(mut self, body: MockBody) -> Self {
-        self.body = body;
-        self
-    }
-
-    pub fn with_error(mut self, error: String) -> Self {
-        self.error = Some(error);
-        self
-    }
-
-    pub fn with_http_code(mut self, http_code: http::StatusCode) -> Self {
-        self.http_code = http_code;
-        self
-    }
-
-    pub fn http_code(&self) -> http::StatusCode {
-        self.http_code
+    pub fn code(&self) -> http::StatusCode {
+        self.code
     }
 
     pub fn grpc_code(&self) -> tonic::Code {
-        tonic::Code::from_http(self.http_code)
+        tonic::Code::from_http(self.code)
     }
 
     pub fn headers(&self) -> &HeaderMap {
         &self.headers
-    }
-
-    pub fn json_body(&self) -> &JsonMockBody {
-        &self.json_body
     }
 
     pub fn body(&self) -> &MockBody {

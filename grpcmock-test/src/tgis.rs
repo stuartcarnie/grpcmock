@@ -58,9 +58,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate() -> Result<(), anyhow::Error> {
-        let mocks = MockSet::with_mocks([(
+        let mocks = MockSet::from_iter([(
             GrpcMethod::new("tgis.GenerationService", "Generate")?,
-            vec![Mock::new(
+            vec![Mock::unary(
                 BatchedGenerationRequest {
                     model_id: "bloom-560m".into(),
                     prefix_id: None,
@@ -111,37 +111,31 @@ mod tests {
         let mut mocks = MockSet::new();
         mocks.insert(
             GrpcMethod::new("tgis.GenerationService", "Generate")?,
-            Mock {
-                request: MockRequest::new(MockBody::Full(
-                    BatchedGenerationRequest {
-                        model_id: "bloom-560m".into(),
-                        prefix_id: None,
-                        requests: vec![GenerationRequest { text: "".into() }],
-                        params: None,
-                    }
-                    .to_bytes(),
-                )),
-                response: MockResponse::default()
-                    .with_http_code(http::StatusCode::BAD_REQUEST)
-                    .with_error("text cannot be empty".into()),
-            },
+            Mock::unary(
+                BatchedGenerationRequest {
+                    model_id: "bloom-560m".into(),
+                    prefix_id: None,
+                    requests: vec![GenerationRequest { text: "".into() }],
+                    params: None,
+                },
+                BatchedGenerationResponse::default(),
+            )
+            .with_code(http::StatusCode::BAD_REQUEST)
+            .with_error("text cannot be empty"),
         );
         mocks.insert(
             GrpcMethod::new("tgis.GenerationService", "Generate")?,
-            Mock {
-                request: MockRequest::new(MockBody::Full(
-                    BatchedGenerationRequest {
-                        model_id: "invalid_model".into(),
-                        prefix_id: None,
-                        requests: vec![GenerationRequest { text: ".".into() }],
-                        params: None,
-                    }
-                    .to_bytes(),
-                )),
-                response: MockResponse::default()
-                    .with_http_code(http::StatusCode::NOT_FOUND)
-                    .with_error("model not found".into()),
-            },
+            Mock::unary(
+                BatchedGenerationRequest {
+                    model_id: "invalid_model".into(),
+                    prefix_id: None,
+                    requests: vec![GenerationRequest { text: ".".into() }],
+                    params: None,
+                },
+                BatchedGenerationResponse::default(),
+            )
+            .with_code(http::StatusCode::NOT_FOUND)
+            .with_error("model not found"),
         );
         let server = MockGenerationServer::start(mocks).await?;
 

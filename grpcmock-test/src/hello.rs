@@ -69,7 +69,7 @@ mod tests {
         let mut mocks = MockSet::new();
         mocks.insert(
             GrpcMethod::new("WrongService", "Hello").unwrap(),
-            Mock::new(
+            Mock::unary(
                 HelloRequest { name: "you".into() },
                 HelloResponse {
                     message: "Hello you!".into(),

@@ -15,7 +15,7 @@ mod tests {
         let mut mocks = MockSet::new();
         mocks.insert(
             GrpcMethod::new("grpc.health.v1.Health", "Check")?,
-            Mock::new(
+            Mock::unary(
                 HealthCheckRequest { service: "".into() },
                 HealthCheckResponse { status: 1 },
             ),

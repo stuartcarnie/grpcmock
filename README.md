@@ -45,24 +45,24 @@ Mocks can be defined in Rust using prost-generated types and grpcmock abstractio
 let mut mocks = MockSet::new();
 mocks.insert(
     GrpcMethod::new("example.Hello", "HelloUnary")?, 
-    Mock::new(HelloRequest {}, HelloResponse {})
+    Mock::unary(HelloRequest {}, HelloResponse {})
 );
 ```
 
-### Create a `MockSet` with a batch of mocks:
+### Create a `MockSet` from an iterator of mocks:
 
 ```rust
-let mocks = MockSet::with_mocks(
+let mocks = MockSet::from_iter(
     [
         // Mocks for HelloUnary method
         (
             GrpcMethod::new("example.Hello", "HelloUnary")?,
-            vec![Mock::new(HelloRequest {}, HelloResponse {})],
+            vec![Mock::unary(HelloRequest {}, HelloResponse {})],
         ),
         // Mocks for HelloClientStreaming method
         (
             GrpcMethod::new("example.Hello", "HelloClientStreaming")?,
-            vec![Mock::new(HelloRequest {}, HelloResponse {})],
+            vec![Mock::unary(HelloRequest {}, HelloResponse {})],
         ),
     ]
 );
@@ -93,7 +93,7 @@ mocks:
 - `mocks` is a list of mocks for the method
 - `request.body` / `response.body` is a JSON representation of the protobuf message
     - `string` for unary, `array<string>` for streaming
-    - Currently, values must be set (even if empty) for *all* `repeated` and `map` fields
+    - **NOTE:** currently, values must be set (even if empty) for *all* fields with non-Option types such as primitives, repeated, and map types. We are investigating a workaround to apply defaults.
 - `response.code` is a HTTP status code that is converted to an equivalent gRPC status code
 - `response.error` is an optional error message for error responses
 - `response.headers` is an optional map of header key-value pairs
@@ -173,7 +173,7 @@ mocks.insert_from_file::<HelloRequest, HelloResponse>("/path/to/file.yaml")?;
             mocks.insert_from_file::<HelloRequest, HelloResponse>("stubs/hello/unary.yaml")?;
             mocks.insert_from_file::<HelloRequest, HelloResponse>("stubs/hello/client_streaming.yaml")?;
 
-            // Alternatively, define mocks in Rust and use MockSet::insert() or MockSet::with_mocks() to build a MockSet.
+            // Alternatively, define mocks in Rust and use MockSet::insert() or MockSet::from_iter() to build a MockSet.
 
             // Start mock server
             let server = MockHelloServer::start(mocks).await?;
