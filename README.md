@@ -14,14 +14,13 @@ grpcmock is a minimal framework for mocking gRPC services in Rust, supporting un
 * [Usage](#usage)
 * [Examples](#examples)
 
-## Features
+# Features
 - Mocks tonic gRPC services
 - Mocks defined in Rust or YAML files using simple, intuitive spec
 - Supports unary, client-streaming, server-streaming, and bidirectional-streaming methods
 - Performs basic "full body" (equals) matching
 
-## Stubbing
-
+# Stubbing
 Reference service spec for examples below.
 ```proto
 syntax = "proto3";
@@ -37,11 +36,10 @@ message HelloRequest { string name = 1; }
 message HelloResponse { string message = 1; }
 ```
 
-### In Rust
-Mocks can be defined in Rust using prost-generated types.
+## In Rust
+Mocks can be defined in Rust using prost-generated types and grpcmock abstractions.
 
-#### Using MockSet::insert()
-Inserts a single `Mock` into a `MockSet`.
+### Insert a single `Mock` into a `MockSet`:
 
 ```rust
 let mut mocks = MockSet::new();
@@ -51,8 +49,7 @@ mocks.insert(
 );
 ```
 
-#### Using MockSet::with_mocks()
-Creates a new `MockSet` with a batch of mocks.
+### Create a `MockSet` with a batch of mocks:
 
 ```rust
 let mocks = MockSet::with_mocks(
@@ -71,32 +68,37 @@ let mocks = MockSet::with_mocks(
 );
 ```
 
-### Mock Files
-Mocks can be defined in Mock Files, which are YAML-formatted specs for a single service method.
+## Mock Files
+Mocks can be defined in YAML files. A Mock File defines mocks for a single method.
 
-Example directory structure for the `example.Hello` service in `<project>/stubs/hello`:
-```
-├── hello
-│   ├── method1.yaml
-│   ├── method2.yaml
-│   ├── method3.yaml
-```
-
-#### Spec:
+### Spec:
 
 ```yaml
 service: 'package.ServiceName' # fully-qualified gRPC service name
 method: 'MethodName' # gRPC method name
 mocks:
 - request:
-    body: '' # [''] for streaming
+    body: '' # JSON string, [''] for streaming
   response:
     code: 200 # optional, default=200
-    body: '' # [''] for streaming
+    body: '' # JSON string, [''] for streaming
+    headers: {} # optional
     error: '' # optional
 ```
 
-#### Examples
+- `service` is the fully-qualified gRPC service name (`<package>.<name>`) as defined in the proto file.
+    - `name` starts with an uppercase letter, e.g. `example.Hello`.
+`method` is the method name
+    - Starts with an uppercase letter, e.g. `HelloUnary`
+- `mocks` is a list of mocks for the method
+- `request.body` / `response.body` is a JSON representation of the protobuf message
+    - `string` for unary, `array<string>` for streaming
+    - Currently, values must be set (even if empty) for *all* `repeated` and `map` fields
+- `response.code` is a HTTP status code that is converted to an equivalent gRPC status code
+- `response.error` is an optional error message for error responses
+- `response.headers` is an optional map of header key-value pairs
+
+### Examples:
 1. **Client-streaming** method with success response
     ```yaml
     service: example.Hello
@@ -123,36 +125,23 @@ mocks:
         error: 'some error message'
     ```
 
-#### Notes
-- `service` is the fully-qualified gRPC service name (`<package>.<name>`) as defined in the proto file.
-    - `name` starts with an uppercase letter, e.g. `example.Hello`.
-`method` is the method name
-    - Starts with an uppercase letter, e.g. `HelloUnary`
-- `mocks` is a list of mocks for the method
-- `request.body` / `response.body` is a JSON representation of the protobuf message
-    - `string` for unary, `array<string>` for streaming
-    - Currently, values must be set (even if empty) for *all* `repeated` and `map` fields
-- `response.code` is a HTTP status code that is converted to an equivalent gRPC status code
-- `response.error` is an optional error message for error responses
+## Insert mocks from a file into a `MockSet`:
 
-#### Using MockSet::insert_from_file<I, O>()
-
-Generic type parameters correspond to prost-generated input and output types 
-of the method defined in the mock file.
+`MockSet::insert_from_file<I, O>()` generic type parameters correspond to prost-generated input and output types of the method defined in the mock file.
 
 ```rust
 let mut mocks = MockSet::new();
 mocks.insert_from_file::<HelloRequest, HelloResponse>("/path/to/file.yaml")?;
 ```
 
-## Usage
-1. Add `grpcmock` to `Cargo.toml`:
-    ```
+# Usage
+1. Add `grpcmock` to `Cargo.toml` as a development dependency:
+    ```toml
     [dev-dependencies]
     grpcmock = "0.1.0"
     ```
 
-2. Add **required** type attributes to your `build.rs` configuration for generated protobuf types:
+2. Add **required** type attributes to your `tonic_build` configuration in `build.rs`. This is to enable `JSON->T` deserialization of prost-generated types via serde.
     ```rust
     tonic_build::configure()
         .type_attribute(
@@ -160,13 +149,11 @@ mocks.insert_from_file::<HelloRequest, HelloResponse>("/path/to/file.yaml")?;
             "#[derive(serde::Deserialize)] #[serde(rename_all = \"snake_case\")]",
         )
     ```
-   This is to enable `JSON->T` deserialization of prost-generated (protobuf) types via serde.
 
 3. Define stubs for your service following [Stubbing](#stubbing) guidance above.
 
-4. In a test context, use as follows:
+4. In a test context, follow the example below:
     ```rust
-
     #[cfg(test)]
     mod tests {
         use pb::{HelloRequest, HelloResponse, hello_client::HelloClient};
@@ -177,12 +164,16 @@ mocks.insert_from_file::<HelloRequest, HelloResponse>("/path/to/file.yaml")?;
         generate_server!("example.Hello", MockHelloServer);
 
         #[tokio::test]
-        async fn test_hello_with_mock_files() -> Result<(), anyhow::Error> {
+        async fn test_grpcmock() -> Result<(), anyhow::Error> {
+            // Create a new MockSet
             let mut mocks = MockSet::new();
-            // Insert mocks from mock files
-            // Generic type parameters correspond to prost-generated input and output types of the method.
+
+            // Load and insert mocks from mock files
+            // NOTE: generic type parameters correspond to prost-generated input and output types of the method.
             mocks.insert_from_file::<HelloRequest, HelloResponse>("stubs/hello/unary.yaml")?;
             mocks.insert_from_file::<HelloRequest, HelloResponse>("stubs/hello/client_streaming.yaml")?;
+
+            // Alternatively, define mocks in Rust and use MockSet::insert() or MockSet::with_mocks() to build a MockSet.
 
             // Start mock server
             let server = MockHelloServer::start(mocks).await?;
@@ -213,5 +204,5 @@ mocks.insert_from_file::<HelloRequest, HelloResponse>("/path/to/file.yaml")?;
     }
     ```
 
-## Examples
+# Examples
 See [grpcmock-test](/grpcmock-test/) crate for more examples.
