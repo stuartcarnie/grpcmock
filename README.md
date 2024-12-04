@@ -125,7 +125,7 @@ mocks:
         error: 'some error message'
     ```
 
-## Insert mocks from a file into a `MockSet`:
+### Insert mocks from a file into a `MockSet`:
 
 `MockSet::insert_from_file<I, O>()` generic type parameters correspond to prost-generated input and output types of the method defined in the mock file.
 
